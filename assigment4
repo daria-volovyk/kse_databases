@@ -1,0 +1,280 @@
+D DROP TABLE IF EXISTS raw_games;
+D CREATE TABLE raw_games AS
+  SELECT *
+  FROM read_json_auto('/Users/apple/Downloads/steam_2025_5k-dataset-games_20250831.json', maximum_object_size=1073741824);
+D CREATE TABLE raw_reviews AS
+  SELECT * FROM read_json_auto('/Users/apple/Downloads/steam_2025_5k-dataset-reviews_20250901.json', maximum_object_size=1073741824);
+Catalog Error:
+Table with name "raw_reviews" already exists!
+D DROP TABLE IF EXISTS raw_reviews;
+D CREATE TABLE raw_reviews AS
+    SELECT * FROM read_json_auto('/Users/apple/Downloads/steam_2025_5k-dataset-reviews_20250901.json', maximum_object_size=1073741824);
+D CREATE TABLE games AS
+  WITH exploded AS (
+      SELECT UNNEST(games) AS game
+      FROM raw_games
+  )
+  SELECT
+      game.appid                                      AS appid,
+      game.app_details.data.name                      AS name,
+      game.app_details.data.release_date.date         AS release_date,
+      game.app_details.data.is_free                   AS is_free,
+      game.app_details.data.platforms.windows         AS windows,
+      game.app_details.data.platforms.mac             AS mac,
+      game.app_details.data.platforms.linux           AS linux,
+      game.app_details.data.genres                    AS genres
+  FROM exploded;
+Catalog Error:
+Table with name "games" already exists!
+D DROP TABLE IF EXISTS games;
+D CREATE TABLE games AS
+  WITH exploded AS (
+      SELECT UNNEST(games) AS game
+      FROM raw_games
+  )
+  SELECT
+      game.appid                                      AS appid,
+      game.app_details.data.name                      AS name,
+      game.app_details.data.release_date.date         AS release_date,
+      game.app_details.data.is_free                   AS is_free,
+      game.app_details.data.platforms.windows         AS windows,
+      game.app_details.data.platforms.mac             AS mac,
+      game.app_details.data.platforms.linux           AS linux,
+      game.app_details.data.genres                    AS genres
+  FROM exploded;
+D -- Створюємо таблицю reviews
+D CREATE TABLE reviews AS
+  WITH exploded AS (
+      SELECT UNNEST(reviews) AS review
+      FROM raw_reviews
+  )
+  SELECT
+      review.appid                                      AS appid,
+      review.review_data.query_summary.num_reviews      AS num_reviews,
+      review.review_data.query_summary.review_score     AS review_score,
+      review.review_data.query_summary.review_score_desc AS review_score_desc,
+      review.review_data.query_summary.total_positive   AS total_positive,
+      review.review_data.query_summary.total_negative   AS total_negative,
+      review.review_data.query_summary.total_reviews    AS total_reviews
+  FROM exploded;
+D SELECT 
+      g.name, 
+      r.num_reviews
+  FROM games g
+  INNER JOIN reviews r
+      ON g.appid = r.appid
+  ORDER BY r.num_reviews DESC
+  LIMIT 20;
+┌────────────────────────────────────────────────────────────────┬─────────────┐
+│                              name                              │ num_reviews │
+│                            varchar                             │    int64    │
+├────────────────────────────────────────────────────────────────┼─────────────┤
+│ Kill The Bad Guy                                               │         100 │
+│ Hentai Summer                                                  │         100 │
+│ DEVOUR                                                         │         100 │
+│ NULL                                                           │         100 │
+│ Starlight Re:Volver                                            │         100 │
+│ Train Sim World® 2: Hauptstrecke Hamburg - Lübeck Route Add-On │         100 │
+│ The Persistence                                                │         100 │
+│ Childhood grocery 辣条杂货店 学校小卖部 :令人感动的童年回忆…   │         100 │
+│ Turnfall                                                       │         100 │
+│ Command & Conquer Red Alert™ 2 and Yuri’s Revenge™             │         100 │
+│ Dead by Daylight - The Halloween® Chapter                      │         100 │
+│ METAL GEAR SOLID V: THE PHANTOM PAIN                           │         100 │
+│ Monster Hunter: World                                          │         100 │
+│ Dying Light 2 Stay Human: Reloaded Edition                     │         100 │
+│ PICO PARK                                                      │         100 │
+│ The Flock                                                      │         100 │
+│ Back to the Dawn                                               │         100 │
+│ Arctic Isolation                                               │         100 │
+│ Infinite Air with Mark McMorris                                │         100 │
+│ Dead by Daylight - Ghost Face®                                 │         100 │
+├────────────────────────────────────────────────────────────────┴─────────────┤
+│ 20 rows                                                            2 columns │
+└──────────────────────────────────────────────────────────────────────────────┘
+D WITH genre_split AS (
+      SELECT
+          g.appid,
+          g.name,
+          r.total_reviews,
+          UNNEST(g.genres).description AS genre_name
+      FROM games g
+      JOIN reviews r ON g.appid = r.appid
+  )
+  SELECT
+      genre_name AS genre,
+      AVG(total_reviews) AS avg_reviews
+  FROM genre_split
+  GROUP BY genre_name
+  ORDER BY avg_reviews DESC;
+┌───────────────────────┬─────────────────────┐
+│         genre         │     avg_reviews     │
+│        varchar        │       double        │
+├───────────────────────┼─────────────────────┤
+│ Carreras              │            429794.0 │
+│ Deportes              │            429794.0 │
+│ Acción                │           107478.75 │
+│ Massively Multiplayer │   5342.364077669903 │
+│ Free To Play          │  1768.5760563380281 │
+│ Action                │  1622.5973514674301 │
+│ Инди                  │              1567.0 │
+│ Экшены                │              1567.0 │
+│ RPG                   │  1427.0066225165563 │
+│ Simulação             │  1212.3333333333333 │
+│ Adventure             │   820.6595152959873 │
+│ Indie                 │   524.1706818181818 │
+│ Aksiyon               │               454.0 │
+│ Strategy              │  334.98895386614686 │
+│ Early Access          │  322.19450317124733 │
+│ Simulation            │  313.54777070063693 │
+│ Racing                │  207.87755102040816 │
+│ Casual                │  130.54597481877147 │
+│ Sports                │   95.60236220472441 │
+│ Indépendant           │                95.0 │
+│      ·                │                  ·  │
+│      ·                │                  ·  │
+│      ·                │                  ·  │
+│ Animation & Modeling  │  30.425531914893618 │
+│ Nudity                │  23.666666666666668 │
+│ Sexual Content        │  19.153846153846153 │
+│ Gore                  │               17.05 │
+│ Simülasyon            │                14.0 │
+│ Strateji              │                14.0 │
+│ Movie                 │                 9.3 │
+│ Audio Production      │   4.769230769230769 │
+│ Software Training     │   4.407407407407407 │
+│ Design & Illustration │   4.389261744966443 │
+│ Game Development      │   4.111111111111111 │
+│ Education             │  2.5762711864406778 │
+│ Multijogador Massivo  │                 2.0 │
+│ Web Publishing        │  1.6754385964912282 │
+│ Short                 │                 1.5 │
+│ Симуляторы            │                 1.0 │
+│ Photo Editing         │ 0.07142857142857142 │
+│ Tutorial              │                 0.0 │
+│ 360 Video             │                 0.0 │
+│ Episodic              │                 0.0 │
+├───────────────────────┴─────────────────────┤
+│ 45 rows (40 shown)                2 columns │
+└─────────────────────────────────────────────┘
+D SELECT
+      CASE
+          WHEN windows THEN 'Windows'
+          WHEN mac THEN 'Mac'
+          WHEN linux THEN 'Linux'
+          ELSE 'Other'
+      END AS platform,
+      ROUND(AVG(review_score), 2) AS avg_review_score
+  FROM games g
+  JOIN reviews r USING (appid)
+  GROUP BY platform
+  ORDER BY avg_review_score DESC;
+┌──────────┬──────────────────┐
+│ platform │ avg_review_score │
+│ varchar  │      double      │
+├──────────┼──────────────────┤
+│ Windows  │             1.78 │
+│ Other    │             0.21 │
+│ Mac      │              0.0 │
+└──────────┴──────────────────┘
+D WITH genre_split AS (
+      SELECT
+          g.appid,
+          UNNEST(g.genres).description AS genre
+      FROM games g
+  )
+  SELECT 
+      genre,
+      COUNT(*) AS num_games
+  FROM genre_split
+  GROUP BY genre
+  ORDER BY num_games DESC;
+┌───────────────────────┬───────────┐
+│         genre         │ num_games │
+│        varchar        │   int64   │
+├───────────────────────┼───────────┤
+│ Indie                 │      4400 │
+│ Action                │      2794 │
+│ Casual                │      2621 │
+│ Adventure             │      2517 │
+│ Simulation            │      1570 │
+│ Strategy              │      1539 │
+│ RPG                   │      1510 │
+│ Free To Play          │       710 │
+│ Early Access          │       473 │
+│ Sports                │       254 │
+│ Racing                │       245 │
+│ Massively Multiplayer │       206 │
+│ Design & Illustration │       149 │
+│ Web Publishing        │       114 │
+│ Utilities             │        74 │
+│ Game Development      │        63 │
+│ Education             │        59 │
+│ Animation & Modeling  │        47 │
+│ Software Training     │        27 │
+│ Video Production      │        26 │
+│        ·              │         · │
+│        ·              │         · │
+│        ·              │         · │
+│ Audio Production      │        13 │
+│ Nudity                │         9 │
+│ Aventura              │         4 │
+│ Acción                │         4 │
+│ Simulação             │         3 │
+│ Episodic              │         2 │
+│ Ação                  │         2 │
+│ Short                 │         2 │
+│ 360 Video             │         1 │
+│ Strateji              │         1 │
+│ Deportes              │         1 │
+│ Multijogador Massivo  │         1 │
+│ Экшены                │         1 │
+│ Indépendant           │         1 │
+│ Carreras              │         1 │
+│ Симуляторы            │         1 │
+│ Aksiyon               │         1 │
+│ Simülasyon            │         1 │
+│ Инди                  │         1 │
+│ Tutorial              │         1 │
+├───────────────────────┴───────────┤
+│ 45 rows (40 shown)      2 columns │
+└───────────────────────────────────┘
+D SELECT
+      g.name,
+      r.review_score,
+      r.total_reviews
+  FROM games g
+  JOIN reviews r USING (appid)
+  WHERE g.is_free = TRUE
+  ORDER BY
+      r.review_score DESC,
+      r.total_reviews DESC
+  LIMIT 20;
+┌───────────────────────────────────────────┬──────────────┬───────────────┐
+│                   name                    │ review_score │ total_reviews │
+│                  varchar                  │    int64     │     int64     │
+├───────────────────────────────────────────┼──────────────┼───────────────┤
+│ Tom Clancy's Rainbow Six® Siege X         │            8 │       1213464 │
+│ RaceRoom Racing Experience                │            8 │          1920 │
+│ FragPunk                                  │            8 │          1603 │
+│ DCS World Steam Edition                   │            8 │           682 │
+│ Blush Blush                               │            8 │           105 │
+│ Just Cause 2: Multiplayer Mod             │            8 │           100 │
+│ TinShift                                  │            8 │            96 │
+│ Kung Fury                                 │            8 │            65 │
+│ RYB                                       │            8 │            63 │
+│ Estranged: Act I                          │            8 │            53 │
+│ Saira                                     │            7 │            48 │
+│ You Have to Win the Game                  │            7 │            48 │
+│ X-Plane 11 - Global Scenery: Africa       │            7 │            43 │
+│ SpaceEngine - Uranus System HD            │            7 │            42 │
+│ Half-Life: A Place in the West            │            7 │            38 │
+│ Wild Warfare                              │            7 │            33 │
+│ Programming Without Coding Technology 2.0 │            7 │            28 │
+│ Sisyphus Reborn                           │            7 │            25 │
+│ Medusa's Labyrinth                        │            7 │            23 │
+│ Moo Moo Move                              │            7 │            21 │
+├───────────────────────────────────────────┴──────────────┴───────────────┤
+│ 20 rows                                                        3 columns │
+└──────────────────────────────────────────────────────────────────────────┘
+D 
